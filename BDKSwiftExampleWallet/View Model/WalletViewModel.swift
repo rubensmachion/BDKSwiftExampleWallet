@@ -127,6 +127,17 @@ class WalletViewModel {
         }
     }
 
+    private func startSyncWithProgress(logger: MessageHandler) async {
+        Task {
+            while true {
+                try await bdkClient.sync(logger)
+                self.walletSyncState = .synced
+                self.getBalance()
+                self.getTransactions()
+            }
+        }
+    }
+
     func syncOrFullScan() async {
         if bdkClient.needsFullScan() {
             await fullScanWithProgress()
@@ -179,5 +190,74 @@ class WalletFullScanScriptInspector: FullScanScriptInspector {
     func inspect(keychain: KeychainKind, index: UInt32, script: Script) {
         inspectedCount += 1
         updateProgress(inspectedCount)
+    }
+}
+
+class MessageHandler: ObservableObject, NodeMessageHandler {
+    @Published var progress: Double = 20
+    @Published var height: UInt32? = nil
+
+    func blocksDisconnected(blocks: [UInt32]) {}
+
+    func connectionsMet() {}
+
+    func dialog(dialog: String) {
+        print(dialog)
+    }
+
+    func stateChanged(state: BitcoinDevKit.NodeState) {
+        DispatchQueue.main.async { [self] in
+            switch state {
+            case .behind:
+                progress = 20
+            case .headersSynced:
+                progress = 40
+            case .filterHeadersSynced:
+                progress = 60
+            case .filtersSynced:
+                progress = 80
+            case .transactionsSynced:
+                progress = 100
+            }
+        }
+    }
+
+    func synced(tip: UInt32) {
+        print("Synced to \(tip)")
+    }
+
+    func txFailed(txid: BitcoinDevKit.Txid) {}
+
+    func txSent(txid: BitcoinDevKit.Txid) {}
+
+    func warning(warning: BitcoinDevKit.Warning) {
+        switch warning {
+        case .notEnoughConnections:
+            print("Searching for connections")
+        case .peerTimedOut:
+            print("A peer timed out")
+        case .unsolicitedMessage:
+            print("A peer sent an unsolicited message")
+        case .couldNotConnect:
+            print("The node reached out to a peer and could not connect")
+        case .corruptedHeaders:
+            print("The loaded headers do not link together")
+        case .transactionRejected:
+            print("A transaction was rejected")
+        case .failedPersistance(let warning):
+            print(warning)
+        case .evaluatingFork:
+            print("Evaluating a potential fork")
+        case .emptyPeerDatabase:
+            print("The peer database is empty")
+        case .unexpectedSyncError(let warning):
+            print(warning)
+        case .noCompactFilters:
+            print("A connected peer does not serve compact block filters")
+        case .potentialStaleTip:
+            print("The node has not seen a new block for a long duration")
+        case .unlinkableAnchor:
+            print("The configured recovery does not link to block headers stored in the database")
+        }
     }
 }
