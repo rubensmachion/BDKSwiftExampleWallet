@@ -127,7 +127,7 @@ class WalletViewModel {
         }
     }
 
-    private func startSyncWithProgress(logger: MessageHandler) async {
+    func startSyncWithProgress(logger: MessageHandler) async {
         Task {
             while true {
                 try await bdkClient.sync(logger)
