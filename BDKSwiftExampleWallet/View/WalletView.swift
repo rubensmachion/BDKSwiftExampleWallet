@@ -195,7 +195,8 @@ struct WalletView: View {
                 ),
                 perform: { _ in
                     Task {
-                        await viewModel.syncOrFullScan()
+                        //                        await viewModel.syncOrFullScan()
+                        await viewModel.startSyncWithProgress(logger: self.messageHandler)
                         viewModel.getBalance()
                         viewModel.getTransactions()
                         await viewModel.getPrices()
