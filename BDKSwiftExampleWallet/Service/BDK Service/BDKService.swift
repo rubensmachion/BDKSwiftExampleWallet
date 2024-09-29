@@ -14,6 +14,7 @@ private class BDKService {
     private var balance: Balance?
     private var connection: Connection?
     private let esploraClient: EsploraClient
+    private var client: LightClient?
     private let keyService: KeyClient
     private var needsFullScan: Bool = false
     var network: Network
@@ -69,6 +70,68 @@ private class BDKService {
         return localOutputs
     }
 
+    //    func createWallet(words: String?) throws {
+    //        let documentsDirectoryURL = URL.documentsDirectory
+    //        let walletDataDirectoryURL = documentsDirectoryURL.appendingPathComponent("wallet_data")
+    //
+    //        if FileManager.default.fileExists(atPath: walletDataDirectoryURL.path) {
+    //            try FileManager.default.removeItem(at: walletDataDirectoryURL)
+    //        } else {
+    //        }
+    //
+    //        let baseUrl =
+    //            try keyService.getEsploraURL() ?? Constants.Config.EsploraServerURLNetwork.Signet.mutiny
+    //
+    //        var words12: String
+    //        if let words = words, !words.isEmpty {
+    //            words12 = words
+    //            needsFullScan = true
+    //        } else {
+    //            let mnemonic = Mnemonic(wordCount: WordCount.words12)
+    //            words12 = mnemonic.description
+    //            needsFullScan = false
+    //        }
+    //        let mnemonic = try Mnemonic.fromString(mnemonic: words12)
+    //        let secretKey = DescriptorSecretKey(
+    //            network: network,
+    //            mnemonic: mnemonic,
+    //            password: nil
+    //        )
+    //        let descriptor = Descriptor.newBip86(
+    //            secretKey: secretKey,
+    //            keychain: .external,
+    //            network: network
+    //        )
+    //        let changeDescriptor = Descriptor.newBip86(
+    //            secretKey: secretKey,
+    //            keychain: .internal,
+    //            network: network
+    //        )
+    //        let backupInfo = BackupInfo(
+    //            mnemonic: mnemonic.description,
+    //            descriptor: descriptor.toStringWithSecret(),
+    //            changeDescriptor: changeDescriptor.toStringWithSecret()
+    //        )
+    //
+    //        try keyService.saveBackupInfo(backupInfo)
+    //        try keyService.saveNetwork(self.network.description)
+    //        try keyService.saveEsploraURL(baseUrl)
+    //
+    //        try FileManager.default.ensureDirectoryExists(at: walletDataDirectoryURL)
+    //        try FileManager.default.removeOldFlatFileIfNeeded(at: documentsDirectoryURL)
+    //        let persistenceBackendPath = walletDataDirectoryURL.appendingPathComponent("wallet.sqlite")
+    //            .path
+    //        let connection = try Connection(path: persistenceBackendPath)
+    //        self.connection = connection
+    //        let wallet = try Wallet(
+    //            descriptor: descriptor,
+    //            changeDescriptor: changeDescriptor,
+    //            network: network,
+    //            connection: connection
+    //        )
+    //        self.wallet = wallet
+    //    }
+
     func createWallet(words: String?) throws {
         let documentsDirectoryURL = URL.documentsDirectory
         let walletDataDirectoryURL = documentsDirectoryURL.appendingPathComponent("wallet_data")
@@ -81,33 +144,19 @@ private class BDKService {
         let baseUrl =
             try keyService.getEsploraURL() ?? Constants.Config.EsploraServerURLNetwork.Signet.mutiny
 
-        var words12: String
-        if let words = words, !words.isEmpty {
-            words12 = words
-            needsFullScan = true
-        } else {
-            let mnemonic = Mnemonic(wordCount: WordCount.words12)
-            words12 = mnemonic.description
-            needsFullScan = false
-        }
-        let mnemonic = try Mnemonic.fromString(mnemonic: words12)
-        let secretKey = DescriptorSecretKey(
-            network: network,
-            mnemonic: mnemonic,
-            password: nil
+        let descriptor = try! Descriptor.init(
+            descriptor:
+                "tr([7d94197e/86'/1'/0']tpubDCyQVJj8KzjiQsFjmb3KwECVXPvMwvAxxZGCP9XmWSopmjW3bCV3wD7TgxrUhiGSueDS1MU5X1Vb1YjYcp8jitXc5fXfdC1z68hDDEyKRNr/0/*)",
+            network: .signet
         )
-        let descriptor = Descriptor.newBip86(
-            secretKey: secretKey,
-            keychain: .external,
-            network: network
+        let changeDescriptor = try! Descriptor.init(
+            descriptor:
+                "tr([7d94197e/86'/1'/0']tpubDCyQVJj8KzjiQsFjmb3KwECVXPvMwvAxxZGCP9XmWSopmjW3bCV3wD7TgxrUhiGSueDS1MU5X1Vb1YjYcp8jitXc5fXfdC1z68hDDEyKRNr/1/*)",
+            network: .signet
         )
-        let changeDescriptor = Descriptor.newBip86(
-            secretKey: secretKey,
-            keychain: .internal,
-            network: network
-        )
+
         let backupInfo = BackupInfo(
-            mnemonic: mnemonic.description,
+            mnemonic: "",
             descriptor: descriptor.toStringWithSecret(),
             changeDescriptor: changeDescriptor.toStringWithSecret()
         )
@@ -129,7 +178,30 @@ private class BDKService {
             connection: connection
         )
         self.wallet = wallet
+
+        let client = self.buildAndRunNode(
+            wallet: wallet,
+            path: documentsDirectoryURL.appendingPathComponent("cbf").path
+        )
+        self.client = client
     }
+
+    //    private func loadWallet(descriptor: Descriptor, changeDescriptor: Descriptor) throws {
+    //        let documentsDirectoryURL = URL.documentsDirectory
+    //        let walletDataDirectoryURL = documentsDirectoryURL.appendingPathComponent("wallet_data")
+    //        try FileManager.default.ensureDirectoryExists(at: walletDataDirectoryURL)
+    //        try FileManager.default.removeOldFlatFileIfNeeded(at: documentsDirectoryURL)
+    //        let persistenceBackendPath = walletDataDirectoryURL.appendingPathComponent("wallet.sqlite")
+    //            .path
+    //        let connection = try Connection(path: persistenceBackendPath)
+    //        self.connection = connection
+    //        let wallet = try Wallet.load(
+    //            descriptor: descriptor,
+    //            changeDescriptor: changeDescriptor,
+    //            connection: connection
+    //        )
+    //        self.wallet = wallet
+    //    }
 
     private func loadWallet(descriptor: Descriptor, changeDescriptor: Descriptor) throws {
         let documentsDirectoryURL = URL.documentsDirectory
@@ -138,6 +210,16 @@ private class BDKService {
         try FileManager.default.removeOldFlatFileIfNeeded(at: documentsDirectoryURL)
         let persistenceBackendPath = walletDataDirectoryURL.appendingPathComponent("wallet.sqlite")
             .path
+        let descriptor = try! Descriptor.init(
+            descriptor:
+                "tr([7d94197e/86'/1'/0']tpubDCyQVJj8KzjiQsFjmb3KwECVXPvMwvAxxZGCP9XmWSopmjW3bCV3wD7TgxrUhiGSueDS1MU5X1Vb1YjYcp8jitXc5fXfdC1z68hDDEyKRNr/0/*)",
+            network: .signet
+        )
+        let changeDescriptor = try! Descriptor.init(
+            descriptor:
+                "tr([7d94197e/86'/1'/0']tpubDCyQVJj8KzjiQsFjmb3KwECVXPvMwvAxxZGCP9XmWSopmjW3bCV3wD7TgxrUhiGSueDS1MU5X1Vb1YjYcp8jitXc5fXfdC1z68hDDEyKRNr/1/*)",
+            network: .signet
+        )
         let connection = try Connection(path: persistenceBackendPath)
         self.connection = connection
         let wallet = try Wallet.load(
@@ -146,6 +228,11 @@ private class BDKService {
             connection: connection
         )
         self.wallet = wallet
+        let client = self.buildAndRunNode(
+            wallet: wallet,
+            path: documentsDirectoryURL.appendingPathComponent("cbf").path
+        )
+        self.client = client
     }
 
     func loadWalletFromBackup() throws {
@@ -222,6 +309,23 @@ private class BDKService {
         }
     }
 
+    func sync(logger: NodeMessageHandler) async throws {
+        guard let client = self.client else {
+            throw WalletError.dbNotFound
+        }
+        guard let wallet = self.wallet else {
+            throw WalletError.walletNotFound
+        }
+        guard let connection = self.connection else {
+            throw WalletError.dbNotFound
+        }
+        let update = await client.update(logger: logger)
+        if update != nil {
+            try! wallet.applyUpdate(update: update!)
+            let _ = try! wallet.persist(connection: connection)
+        }
+    }
+
     func syncWithInspector(inspector: SyncScriptInspector) async throws {
         guard let wallet = self.wallet else { throw WalletError.walletNotFound }
         let esploraClient = self.esploraClient
@@ -284,6 +388,24 @@ private class BDKService {
 }
 
 extension BDKService {
+    private func buildAndRunNode(wallet: Wallet, path: String) -> LightClient {
+        let peers = [Peer.v4(q1: 68, q2: 47, q3: 229, q4: 218)]
+        let spv = try! buildLightClient(
+            wallet: wallet,
+            peers: peers,
+            connections: 1,
+            recoveryHeight: 170_000,
+            useLookaheadScripts: true,
+            dataDir: path
+        )
+        let node = spv.node
+        let client = spv.client
+        runNode(node: node)
+        return client
+    }
+}
+
+extension BDKService {
     func needsFullScanOfWallet() -> Bool {
         return needsFullScan
     }
@@ -300,6 +422,7 @@ struct BDKClient {
     let getBalance: () throws -> Balance
     let transactions: () throws -> [CanonicalTx]
     let listUnspent: () throws -> [LocalOutput]
+    let sync: (NodeMessageHandler) async throws -> Void
     let syncWithInspector: (SyncScriptInspector) async throws -> Void
     let fullScanWithInspector: (FullScanScriptInspector) async throws -> Void
     let getAddress: () throws -> String
@@ -321,6 +444,7 @@ extension BDKClient {
         getBalance: { try BDKService.shared.getBalance() },
         transactions: { try BDKService.shared.transactions() },
         listUnspent: { try BDKService.shared.listUnspent() },
+        sync: { logger in try await BDKService.shared.sync(logger: logger) },
         syncWithInspector: { inspector in
             try await BDKService.shared.syncWithInspector(inspector: inspector)
         },
@@ -366,6 +490,7 @@ extension BDKClient {
                     .mock
                 ]
             },
+            sync: { _ in },
             syncWithInspector: { _ in },
             fullScanWithInspector: { _ in },
             getAddress: { "tb1pd8jmenqpe7rz2mavfdx7uc8pj7vskxv4rl6avxlqsw2u8u7d4gfs97durt" },
