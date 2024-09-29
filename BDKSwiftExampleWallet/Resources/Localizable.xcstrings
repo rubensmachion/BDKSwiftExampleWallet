@@ -153,6 +153,9 @@
         }
       }
     },
+    "%lld%%" : {
+
+    },
     "%llu" : {
       "localizations" : {
         "fr" : {
@@ -408,6 +411,9 @@
           }
         }
       }
+    },
+    "Kyoto" : {
+
     },
     "Navigation Title" : {
       "extractionState" : "stale",

@@ -81,8 +81,29 @@ struct WalletView: View {
                         Text("Activity")
                         Spacer()
 
-                        ProgressView(value: messageHandler.progress, total: 100)
-                        Spacer()
+                        //                        HStack {
+                        //                            ProgressView(value: messageHandler.progress, total: 100)
+                        //                            Text("\(Int(messageHandler.progress))%")
+                        //                                .font(.caption2)
+                        //                        }
+
+                        HStack {
+                            if messageHandler.progress < 100 {
+                                ProgressView(value: messageHandler.progress, total: 100)
+                                    .foregroundStyle(.green)
+                            } else {
+                                Text("Kyoto")
+                            }
+                            Text("\(Int(messageHandler.progress))%")
+                        }
+                        .font(.caption)
+                        .fontWeight(.regular)
+                        .foregroundStyle(
+                            messageHandler.progress < 100 ? .primary : .secondary
+                        )
+                        .animation(.interactiveSpring, value: messageHandler.progress)
+
+                        //                        Spacer()
 
                         HStack {
                             HStack(spacing: 5) {
