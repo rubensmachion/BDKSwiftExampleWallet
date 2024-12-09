@@ -309,7 +309,7 @@ private class BDKService {
         }
     }
 
-    func sync(logger: NodeMessageHandler) async throws {
+    func sync(logger: NodeEventHandler) async throws {
         guard let client = self.client else {
             throw WalletError.dbNotFound
         }
@@ -319,7 +319,7 @@ private class BDKService {
         guard let connection = self.connection else {
             throw WalletError.dbNotFound
         }
-        let update = await client.update(logger: logger)
+        let update = await client.update(eventHandler: logger)
         if update != nil {
             try! wallet.applyUpdate(update: update!)
             let _ = try! wallet.persist(connection: connection)
@@ -389,13 +389,24 @@ private class BDKService {
 
 extension BDKService {
     private func buildAndRunNode(wallet: Wallet, path: String) -> LightClient {
-        let peers = [Peer.v4(q1: 68, q2: 47, q3: 229, q4: 218)]
+        let peers = [
+            Peer.init(
+                address: IpAddress.fromIpv4(
+                    q1: UInt8(64),
+                    q2: UInt8(47),
+                    q3: UInt8(229),
+                    q4: UInt8(218)
+                ),
+                port: nil,
+                v2Transport: false
+            )
+        ]
+        //[Peer.v4(q1: 68, q2: 47, q3: 229, q4: 218)]
         let spv = try! buildLightClient(
             wallet: wallet,
             peers: peers,
             connections: 1,
             recoveryHeight: 170_000,
-            useLookaheadScripts: true,
             dataDir: path
         )
         let node = spv.node
@@ -422,7 +433,7 @@ struct BDKClient {
     let getBalance: () throws -> Balance
     let transactions: () throws -> [CanonicalTx]
     let listUnspent: () throws -> [LocalOutput]
-    let sync: (NodeMessageHandler) async throws -> Void
+    let sync: (NodeEventHandler) async throws -> Void
     let syncWithInspector: (SyncScriptInspector) async throws -> Void
     let fullScanWithInspector: (FullScanScriptInspector) async throws -> Void
     let getAddress: () throws -> String

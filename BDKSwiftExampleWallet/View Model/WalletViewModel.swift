@@ -193,7 +193,7 @@ class WalletFullScanScriptInspector: FullScanScriptInspector {
     }
 }
 
-class MessageHandler: ObservableObject, NodeMessageHandler {
+class MessageHandler: ObservableObject, NodeEventHandler {
     @Published var progress: Double = 20
     @Published var height: UInt32? = nil
 
@@ -258,6 +258,8 @@ class MessageHandler: ObservableObject, NodeMessageHandler {
             print("The node has not seen a new block for a long duration")
         case .unlinkableAnchor:
             print("The configured recovery does not link to block headers stored in the database")
+        case .channelDropped:
+            print("A channel that was supposed to receive a message was dropped")
         }
     }
 }
