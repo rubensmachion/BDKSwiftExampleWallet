@@ -86,6 +86,40 @@ struct WalletRecoveryView: View {
 
                     HStack {
                         Spacer()
+                        Button {
+                            let xPub = viewModel.xPub
+                            UIPasteboard.general.string = xPub
+                            isCopied = true
+                            showCheckmark = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+                                isCopied = false
+                                showCheckmark = false
+                            }
+                        } label: {
+                            HStack {
+                                Image(
+                                    systemName: showCheckmark
+                                        ? "document.on.document.fill" : "document.on.document"
+                                )
+                                .contentTransition(.symbolEffect(.replace))
+                                Text("xPub")
+                                    .bold()
+                            }
+                        }
+                        .buttonStyle(
+                            BitcoinFilled(
+                                width: 120,
+                                height: 40,
+                                tintColor: .primary,
+                                textColor: Color(uiColor: .systemBackground),
+                                isCapsule: true
+                            )
+                        )
+                        Spacer()
+                    }
+                    
+                    HStack {
+                        Spacer()
 
                         let formattedDescriptors = """
                             External Private: \(backupInfo.descriptor)

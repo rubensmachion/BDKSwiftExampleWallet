@@ -19,6 +19,28 @@ class WalletRecoveryViewModel {
     var publicChangeDescriptor: Descriptor?
     var walletRecoveryViewError: AppError?
     var showingWalletRecoveryViewErrorAlert: Bool
+    
+    var xPub: String? {
+        guard let descriptor = publicDescriptor?.description else {
+            return nil
+        }
+        
+        let pattern = #"tpub[a-zA-Z0-9]+"#
+        
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let range = NSRange(descriptor.startIndex..., in: descriptor)
+            if let match = regex.firstMatch(in: descriptor, range: range),
+               let tpubRange = Range(match.range, in: descriptor) {
+                let tpub = String(descriptor[tpubRange])
+                print("tpub encontrado: \(tpub)")
+                return tpub
+            } else {
+                print("Nenhum tpub encontrado.")
+            }
+        }
+        
+        return nil
+    }
 
     init(
         bdkClient: BDKClient = .live,
