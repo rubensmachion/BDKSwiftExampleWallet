@@ -501,6 +501,9 @@
         }
       }
     },
+    "Currency" : {
+
+    },
     "Danger Zone" : {
       "localizations" : {
         "fr" : {

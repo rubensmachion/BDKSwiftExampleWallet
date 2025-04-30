@@ -67,6 +67,13 @@ struct SettingsView: View {
                             .foregroundStyle(.primary)
                             .animation(.easeInOut, value: viewModel.inspectedScripts)
                     }
+                    HStack {
+                        Text("Currency")
+                        Spacer()
+                        Text("\(viewModel.currency)")
+                            .foregroundStyle(.sec)
+                    }
+                    
                 }
                 .listRowBackground(
                     colorScheme == .light ? Color.gray.opacity(0.1) : Color.black.opacity(0.2)

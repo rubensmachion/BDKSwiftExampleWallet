@@ -20,6 +20,7 @@ class SettingsViewModel: ObservableObject {
     @Published var settingsError: AppError?
     @Published var showingSettingsViewErrorAlert = false
     @Published var walletSyncState: WalletSyncState = .notStarted
+    @Published var currency: CurrencyCode = .USD
 
     private var updateProgressFullScan: @Sendable (UInt64) -> Void {
         { [weak self] inspected in
