@@ -9,6 +9,20 @@ import BitcoinDevKit
 import Foundation
 
 private class BDKService {
+    
+    private var documentsDirectoryURL: URL {
+        return URL.documentsDirectory
+    }
+    
+    private var walletDataDirectoryURL: URL {
+        return documentsDirectoryURL.appendingPathComponent("wallet_data")
+    }
+    
+    private var persistenceBackendPath: String {
+        walletDataDirectoryURL.appendingPathComponent("wallet.sqlite")
+            .path
+    }
+    
     static var shared: BDKService = BDKService()
 
     private var balance: Balance?
@@ -117,12 +131,12 @@ private class BDKService {
             mnemonic: mnemonic,
             password: nil
         )
-        let descriptor = Descriptor.newBip86(
+        let descriptor = Descriptor.newBip84(
             secretKey: secretKey,
             keychain: .external,
             network: network
         )
-        let changeDescriptor = Descriptor.newBip86(
+        let changeDescriptor = Descriptor.newBip84(
             secretKey: secretKey,
             keychain: .internal,
             network: network
@@ -256,25 +270,9 @@ private class BDKService {
     private func sync() throws {
         guard let wallet = wallet else { return }
         
-        let peers = [
-            Peer.init(
-                address: IpAddress.fromIpv4(
-                    q1: UInt8(127),
-                    q2: UInt8(0),
-                    q3: UInt8(0),
-                    q4: UInt8(1)
-                ),
-                port: nil,
-                v2Transport: false
-            )
-        ]
-        
         guard let spv = try? CbfBuilder()
-            .connections(connections: 1)
-            .peers(peers: peers)
-            .dataDir(dataDir: URL.documentsDirectory.path())
-            .scanType(scanType: .recovery(fromHeight: 830_000))
-//            .scanType(scanType: .sync)
+            .dataDir(dataDir: documentsDirectoryURL.path())
+            .scanType(scanType: .recovery(fromHeight: 252_000))
             .logLevel(logLevel: .debug)
             .build(wallet: wallet) else {
             return
@@ -284,38 +282,36 @@ private class BDKService {
         let client = spv.client
         node.run()
         listener(client: client)
-        Task {
-            do {
-                guard let update = await client.update() else {
-                    return
-                }
-                try wallet.applyUpdate(update: update)
-            } catch {
-                print(error.localizedDescription)
-            }
-        }
+        updateClient(client: client)
     }
     
     private func listener(client: CbfClient) {
         Task {
-            let isRunnig = await client.isRunning()
-            if !isRunnig {
-                return
+            while true {
+                let log = try await client.nextLog()
+                debug(log: log)
+                
+                let warning = try await client.nextWarning()
+                debug(log: warning)
             }
-            
-            do {
-                if await client.isRunning() {
-                    let log = try await client.nextLog()
-                    debug(log: log)
-                    let warning = try await client.nextWarning()
-                    print("Warning: \(warning)")
-                    Thread.sleep(forTimeInterval: 5.0)
-                    listener(client: client)
-                } else {
-                    print("Not running")
+        }
+    }
+    
+    private func updateClient(client: CbfClient) {
+        Task {
+            while true {
+                do {
+                    guard let update = await client.update() else {
+                        return
+                    }
+                    try wallet?.applyUpdate(update: update)
+                    guard let connection = self.connection else {
+                        return
+                    }
+                    let _ = try wallet?.persist(connection: connection)
+                } catch {
+                    print(error.localizedDescription)
                 }
-            } catch {
-                print(error.localizedDescription)
             }
         }
     }
@@ -323,25 +319,32 @@ private class BDKService {
     private func debug(log: Log) {
         switch log {
         case .debug(log: let log):
-            print(log)
+            print("Debug: \(log)")
         case .connectionsMet:
             print("-- Connected")
-        case .progress(progress: let progress):
+        case .progress(let progress):
             print("-- Progress: \(progress)")
-        case .stateUpdate(nodeState: let nodeState):
+        case .stateUpdate(let nodeState):
             print("-- State: \(nodeState)")
         case .txSent(txid: let txid):
             print("-- Sent tx: \(txid)")
         }
     }
     
+    private func debug(log: Warning) {
+        switch log {
+        default:
+            print("Warning: \(log)")
+        }
+    }
+    
     private func loadWallet(descriptor: Descriptor, changeDescriptor: Descriptor) throws {
-        let documentsDirectoryURL = URL.documentsDirectory
-        let walletDataDirectoryURL = documentsDirectoryURL.appendingPathComponent("wallet_data")
+//        let documentsDirectoryURL = URL.documentsDirectory
+//        let walletDataDirectoryURL = documentsDirectoryURL.appendingPathComponent("wallet_data")
         try FileManager.default.ensureDirectoryExists(at: walletDataDirectoryURL)
         try FileManager.default.removeOldFlatFileIfNeeded(at: documentsDirectoryURL)
-        let persistenceBackendPath = walletDataDirectoryURL.appendingPathComponent("wallet.sqlite")
-            .path
+//        let persistenceBackendPath = walletDataDirectoryURL.appendingPathComponent("wallet.sqlite")
+//            .path
         let connection = try Connection(path: persistenceBackendPath)
         self.connection = connection
         let wallet = try Wallet.load(
@@ -374,8 +377,8 @@ private class BDKService {
 
         try self.keyClient.deleteBackupInfo()
 
-        let documentsDirectoryURL = URL.documentsDirectory
-        let walletDataDirectoryURL = documentsDirectoryURL.appendingPathComponent("wallet_data")
+//        let documentsDirectoryURL = URL.documentsDirectory
+//        let walletDataDirectoryURL = documentsDirectoryURL.appendingPathComponent("wallet_data")
         if FileManager.default.fileExists(atPath: walletDataDirectoryURL.path) {
             try FileManager.default.removeItem(at: walletDataDirectoryURL)
         }
