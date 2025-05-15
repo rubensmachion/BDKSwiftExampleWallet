@@ -253,6 +253,88 @@ private class BDKService {
         self.wallet = wallet
     }
 
+    private func sync() throws {
+        guard let wallet = wallet else { return }
+        
+        let peers = [
+            Peer.init(
+                address: IpAddress.fromIpv4(
+                    q1: UInt8(127),
+                    q2: UInt8(0),
+                    q3: UInt8(0),
+                    q4: UInt8(1)
+                ),
+                port: nil,
+                v2Transport: false
+            )
+        ]
+        
+        guard let spv = try? CbfBuilder()
+            .connections(connections: 1)
+            .peers(peers: peers)
+            .dataDir(dataDir: URL.documentsDirectory.path())
+            .scanType(scanType: .recovery(fromHeight: 830_000))
+//            .scanType(scanType: .sync)
+            .logLevel(logLevel: .debug)
+            .build(wallet: wallet) else {
+            return
+        }
+        
+        let node = spv.node
+        let client = spv.client
+        node.run()
+        listener(client: client)
+        Task {
+            do {
+                guard let update = await client.update() else {
+                    return
+                }
+                try wallet.applyUpdate(update: update)
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
+    }
+    
+    private func listener(client: CbfClient) {
+        Task {
+            let isRunnig = await client.isRunning()
+            if !isRunnig {
+                return
+            }
+            
+            do {
+                if await client.isRunning() {
+                    let log = try await client.nextLog()
+                    debug(log: log)
+                    let warning = try await client.nextWarning()
+                    print("Warning: \(warning)")
+                    Thread.sleep(forTimeInterval: 5.0)
+                    listener(client: client)
+                } else {
+                    print("Not running")
+                }
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
+    }
+    
+    private func debug(log: Log) {
+        switch log {
+        case .debug(log: let log):
+            print(log)
+        case .connectionsMet:
+            print("-- Connected")
+        case .progress(progress: let progress):
+            print("-- Progress: \(progress)")
+        case .stateUpdate(nodeState: let nodeState):
+            print("-- State: \(nodeState)")
+        case .txSent(txid: let txid):
+            print("-- Sent tx: \(txid)")
+        }
+    }
+    
     private func loadWallet(descriptor: Descriptor, changeDescriptor: Descriptor) throws {
         let documentsDirectoryURL = URL.documentsDirectory
         let walletDataDirectoryURL = documentsDirectoryURL.appendingPathComponent("wallet_data")
@@ -268,6 +350,8 @@ private class BDKService {
             connection: connection
         )
         self.wallet = wallet
+        
+        try sync()
     }
 
     func loadWalletFromBackup() throws {
