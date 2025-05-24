@@ -48,8 +48,6 @@ struct WalletView: View {
                         totalScripts: viewModel.totalScripts,
                         needsFullScan: viewModel.isNeedFullScan
                     ) {
-                        // TODO: fix bug
-                        StorageUtil.shared.isNeedFullScan = false
                         showAllTransactions = true
                     }
                     
